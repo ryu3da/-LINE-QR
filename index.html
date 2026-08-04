@@ -202,17 +202,16 @@
           "準備ができました。ボタンを押してください。"
         );
 
-      } catch (error) {
-        console.error("LIFF初期化エラー：", error);
+      catch (error) {
+  console.error(error);
 
-        scanButton.disabled = true;
-        scanButton.textContent = "初期化に失敗しました";
+  alert(JSON.stringify(error));
 
-        setStatus(
-          `LIFFの初期化に失敗しました：${error.message}`,
-          "error"
-        );
-      }
+  scanButton.disabled = true;
+  scanButton.textContent = "初期化に失敗しました";
+
+  setStatus(error.message, "error");
+}
     }
 
     async function scanQrCode() {
