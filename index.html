@@ -169,7 +169,8 @@
       }
     }
 
-    async function initializeLiff() {
+    async function async function initializeLiff() {   try {     await liff.init({       liffId: LIFF_ID     });      if (!liff.isLoggedIn()) {       liff.login();       return;     }      if (!liff.isApiAvailable("scanCodeV2")) {       scanButton.disabled = true;       scanButton.textContent = "この環境では利用できません";        setStatus(         "LINEアプリ内から開き、LIFF設定の「Scan QR」がONになっているか確認してください。",         "error"       );        return;     }      scanButton.disabled = false;     scanButton.textContent = "QRコードを読み取る";      setStatus(       "準備ができました。ボタンを押してください。",       "success"     );    } catch (error) {     console.error("LIFF初期化エラー：", error);      scanButton.disabled = true;     scanButton.textContent = "初期化に失敗しました";      const errorMessage =       error?.message || "原因不明のエラーが発生しました。";      setStatus(       `LIFFの初期化に失敗しました：${errorMessage}`,       "error"     );      alert(`LIFF初期化エラー
+${errorMessage}`);   } } {
       try {
         if (LIFF_ID === "ここにLIFF_IDを入力") {
           throw new Error("LIFF IDが設定されていません。");
