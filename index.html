@@ -1,40 +1,274 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QRコードスキャナー</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  >
+
+  <title>QRコードスキャナー</title>
+
+  <!-- LIFF SDK -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding:
+        calc(24px + env(safe-area-inset-top))
+        20px
+        calc(24px + env(safe-area-inset-bottom));
+      background: #f5f7fb;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Hiragino Sans",
+        "Yu Gothic",
+        sans-serif;
+      color: #15213a;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 32px 24px;
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
+      text-align: center;
+    }
+
+    .icon {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 18px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #e8f9ef;
+      font-size: 36px;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: 26px;
+      line-height: 1.4;
+    }
+
+    .description {
+      margin: 0 0 28px;
+      color: #5f6879;
+      font-size: 15px;
+      line-height: 1.8;
+    }
+
+    button {
+      width: 100%;
+      padding: 17px;
+      border: none;
+      border-radius: 12px;
+      background: #06c755;
+      color: #ffffff;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #aeb5bf;
+      cursor: not-allowed;
+    }
+
+    #status {
+      min-height: 24px;
+      margin: 20px 0 0;
+      font-size: 14px;
+      line-height: 1.7;
+      overflow-wrap: anywhere;
+    }
+
+    .success {
+      color: #087a37;
+    }
+
+    .error {
+      color: #d93025;
+    }
+
+    .result {
+      margin-top: 18px;
+      padding: 14px;
+      background: #f7f8fa;
+      border-radius: 10px;
+      font-size: 13px;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+  </style>
 </head>
+
 <body>
-  <div class="container">
-    <h1>QRコードスキャナー</h1>
+  <main class="container">
+    <div class="icon">📷</div>
 
-    <div class="video-wrap">
-      <video id="video" playsinline></video>
-      <div class="scan-frame"></div>
-    </div>
+    <h1>店頭QRコードを読み取る</h1>
 
-    <canvas id="canvas" hidden></canvas>
+    <p class="description">
+      下のボタンを押して、店頭に設置されている<br>
+      エルメのQRコードを読み取ってください。
+    </p>
 
-    <div class="controls">
-      <button id="startBtn">スキャン開始</button>
-      <button id="stopBtn" disabled>停止</button>
-    </div>
+    <button id="scanButton" type="button" disabled>
+      準備中です
+    </button>
 
-    <div class="result" id="resultBox" hidden>
-      <h2>読み取り結果</h2>
-      <p id="resultText"></p>
-      <div class="result-actions">
-        <button id="copyBtn">コピー</button>
-        <a id="openLink" href="#" target="_blank" rel="noopener noreferrer" hidden>開く</a>
-      </div>
-    </div>
+    <p id="status" aria-live="polite"></p>
 
-    <p id="statusText" class="status"></p>
-  </div>
+    <div id="resultBox" class="result" hidden></div>
+  </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-  <script src="app.js"></script>
+  <script>
+    /*
+     * LINE Developersに表示されている
+     * LIFF IDへ必ず差し替えてください。
+     */
+    const LIFF_ID = "ここにLIFF_IDを入力";
+
+    const scanButton = document.getElementById("scanButton");
+    const statusElement = document.getElementById("status");
+    const resultBox = document.getElementById("resultBox");
+
+    function setStatus(message, type = "") {
+      statusElement.textContent = message;
+      statusElement.className = type;
+    }
+
+    function showResult(value) {
+      resultBox.hidden = false;
+      resultBox.textContent = `読み取り結果：${value}`;
+    }
+
+    function isHttpUrl(value) {
+      try {
+        const url = new URL(value);
+
+        return (
+          url.protocol === "https:" ||
+          url.protocol === "http:"
+        );
+      } catch {
+        return false;
+      }
+    }
+
+    async function initializeLiff() {
+      try {
+        if (LIFF_ID === "ここにLIFF_IDを入力") {
+          throw new Error("LIFF IDが設定されていません。");
+        }
+
+        await liff.init({
+          liffId: LIFF_ID
+        });
+
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        if (!liff.isApiAvailable("scanCodeV2")) {
+          scanButton.textContent = "この環境では利用できません";
+
+          setStatus(
+            "LINEアプリ内から開いてください。LIFF設定の「Scan QR」がONかも確認してください。",
+            "error"
+          );
+
+          return;
+        }
+
+        scanButton.disabled = false;
+        scanButton.textContent = "QRコードを読み取る";
+
+        setStatus(
+          "準備ができました。ボタンを押してください。"
+        );
+
+      } catch (error) {
+        console.error("LIFF初期化エラー：", error);
+
+        scanButton.disabled = true;
+        scanButton.textContent = "初期化に失敗しました";
+
+        setStatus(
+          `LIFFの初期化に失敗しました：${error.message}`,
+          "error"
+        );
+      }
+    }
+
+    async function scanQrCode() {
+      scanButton.disabled = true;
+      setStatus("QRコードリーダーを起動しています。");
+
+      try {
+        const result = await liff.scanCodeV2();
+        const scannedValue = result.value;
+
+        if (!scannedValue) {
+          throw new Error("QRコードの内容を取得できませんでした。");
+        }
+
+        showResult(scannedValue);
+
+        if (isHttpUrl(scannedValue)) {
+          setStatus(
+            "読み取りに成功しました。ページを開いています。",
+            "success"
+          );
+
+          setTimeout(() => {
+            window.location.href = scannedValue;
+          }, 500);
+
+          return;
+        }
+
+        setStatus(
+          "QRコードを読み取りましたが、URLではありませんでした。",
+          "success"
+        );
+
+      } catch (error) {
+        console.error("QR読取エラー：", error);
+
+        if (
+          error.code === "CANCEL" ||
+          error.message?.toLowerCase().includes("cancel")
+        ) {
+          setStatus("読み取りをキャンセルしました。");
+        } else {
+          setStatus(
+            `QRコードを読み取れませんでした：${error.message}`,
+            "error"
+          );
+        }
+      } finally {
+        scanButton.disabled = false;
+      }
+    }
+
+    scanButton.addEventListener("click", scanQrCode);
+
+    initializeLiff();
+  </script>
 </body>
 </html>
