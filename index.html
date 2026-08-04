@@ -8,14 +8,26 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
 
-  <title>QRコードスキャナー</title>
+  <title>店頭QRコードスキャナー</title>
 
-  <!-- LIFF SDK -->
+  <!-- LINE Front-end Framework SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
     * {
       box-sizing: border-box;
+    }
+
+    :root {
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Hiragino Sans",
+        "Yu Gothic",
+        "Noto Sans JP",
+        sans-serif;
+      color: #15213a;
+      background: #f5f7fb;
     }
 
     body {
@@ -26,13 +38,6 @@
         20px
         calc(24px + env(safe-area-inset-bottom));
       background: #f5f7fb;
-      font-family:
-        -apple-system,
-        BlinkMacSystemFont,
-        "Hiragino Sans",
-        "Yu Gothic",
-        sans-serif;
-      color: #15213a;
     }
 
     .container {
@@ -80,11 +85,19 @@
       font-size: 17px;
       font-weight: 700;
       cursor: pointer;
+      transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+    }
+
+    button:active:not(:disabled) {
+      transform: scale(0.99);
     }
 
     button:disabled {
       background: #aeb5bf;
       cursor: not-allowed;
+      opacity: 0.9;
     }
 
     #status {
@@ -109,15 +122,21 @@
       background: #f7f8fa;
       border-radius: 10px;
       font-size: 13px;
+      line-height: 1.7;
       text-align: left;
       overflow-wrap: anywhere;
+    }
+
+    .retry-button {
+      margin-top: 14px;
+      background: #15213a;
     }
   </style>
 </head>
 
 <body>
   <main class="container">
-    <div class="icon">📷</div>
+    <div class="icon" aria-hidden="true">📷</div>
 
     <h1>店頭QRコードを読み取る</h1>
 
@@ -133,16 +152,24 @@
     <p id="status" aria-live="polite"></p>
 
     <div id="resultBox" class="result" hidden></div>
+
+    <button
+      id="retryButton"
+      class="retry-button"
+      type="button"
+      hidden
+    >
+      もう一度読み取る
+    </button>
   </main>
 
   <script>
-    /*
-     * LINE Developersに表示されている
-     * LIFF IDへ必ず差し替えてください。
-     */
+    "use strict";
+
     const LIFF_ID = "2010959622-FjMnmXLN";
 
     const scanButton = document.getElementById("scanButton");
+    const retryButton = document.getElementById("retryButton");
     const statusElement = document.getElementById("status");
     const resultBox = document.getElementById("resultBox");
 
@@ -154,75 +181,78 @@
     function showResult(value) {
       resultBox.hidden = false;
       resultBox.textContent = `読み取り結果：${value}`;
+      retryButton.hidden = false;
+    }
+
+    function clearResult() {
+      resultBox.hidden = true;
+      resultBox.textContent = "";
+      retryButton.hidden = true;
     }
 
     function isHttpUrl(value) {
       try {
         const url = new URL(value);
-
-        return (
-          url.protocol === "https:" ||
-          url.protocol === "http:"
-        );
+        return url.protocol === "https:" || url.protocol === "http:";
       } catch {
         return false;
       }
     }
 
-   async function initializeLiff() {
+    async function initializeLiff() {
+      try {
+        await liff.init({
+          liffId: LIFF_ID
+        });
 
-  try {
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
 
-    await liff.init({
-      liffId: LIFF_ID
-    });
+        if (!liff.isApiAvailable("scanCodeV2")) {
+          scanButton.disabled = true;
+          scanButton.textContent = "この環境では利用できません";
 
-    if (!liff.isLoggedIn()) {
-      liff.login();
-      return;
+          setStatus(
+            "LINEアプリ内から開き、LINE DevelopersのLIFF設定で「Scan QR」がON、サイズが「Full」になっているか確認してください。",
+            "error"
+          );
+
+          return;
+        }
+
+        scanButton.disabled = false;
+        scanButton.textContent = "QRコードを読み取る";
+
+        setStatus(
+          "準備ができました。ボタンを押してください。",
+          "success"
+        );
+      } catch (error) {
+        console.error("LIFF初期化エラー：", error);
+
+        const errorMessage =
+          error?.message || "原因不明のエラーが発生しました。";
+
+        scanButton.disabled = true;
+        scanButton.textContent = "初期化に失敗しました";
+
+        setStatus(
+          `LIFFの初期化に失敗しました：${errorMessage}`,
+          "error"
+        );
+      }
     }
 
-    if (!liff.isApiAvailable("scanCodeV2")) {
-
-      scanButton.disabled = true;
-      scanButton.textContent = "この環境では利用できません";
-
-      setStatus(
-        "LINEアプリ内から開き、Scan QRをONにしてください。",
-        "error"
-      );
-
-      return;
-    }
-
-    scanButton.disabled = false;
-    scanButton.textContent = "QRコードを読み取る";
-
-    setStatus(
-      "準備ができました。",
-      "success"
-    );
-
-  } catch (error) {
-
-    console.error(error);
-
-    alert(error.message);
-
-    scanButton.disabled = true;
-    scanButton.textContent = "初期化エラー";
-
-    setStatus(error.message, "error");
-  }
-
-}
     async function scanQrCode() {
       scanButton.disabled = true;
+      clearResult();
       setStatus("QRコードリーダーを起動しています。");
 
       try {
         const result = await liff.scanCodeV2();
-        const scannedValue = result.value;
+        const scannedValue = result?.value?.trim();
 
         if (!scannedValue) {
           throw new Error("QRコードの内容を取得できませんでした。");
@@ -237,28 +267,32 @@
           );
 
           setTimeout(() => {
-            window.location.href = scannedValue;
-          }, 500);
+            window.location.assign(scannedValue);
+          }, 600);
 
           return;
         }
 
         setStatus(
-          "QRコードを読み取りましたが、URLではありませんでした。",
+          "QRコードを読み取りましたが、URL形式ではありませんでした。",
           "success"
         );
-
       } catch (error) {
         console.error("QR読取エラー：", error);
 
+        const errorCode = String(error?.code || "").toUpperCase();
+        const errorMessage = String(error?.message || "");
+
         if (
-          error.code === "CANCEL" ||
-          error.message?.toLowerCase().includes("cancel")
+          errorCode === "CANCEL" ||
+          errorMessage.toLowerCase().includes("cancel")
         ) {
           setStatus("読み取りをキャンセルしました。");
         } else {
           setStatus(
-            `QRコードを読み取れませんでした：${error.message}`,
+            `QRコードを読み取れませんでした：${
+              errorMessage || "もう一度お試しください。"
+            }`,
             "error"
           );
         }
@@ -268,6 +302,7 @@
     }
 
     scanButton.addEventListener("click", scanQrCode);
+    retryButton.addEventListener("click", scanQrCode);
 
     initializeLiff();
   </script>
