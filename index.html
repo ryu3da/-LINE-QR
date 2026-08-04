@@ -169,52 +169,53 @@
       }
     }
 
-    async function async function initializeLiff() {   try {     await liff.init({       liffId: LIFF_ID     });      if (!liff.isLoggedIn()) {       liff.login();       return;     }      if (!liff.isApiAvailable("scanCodeV2")) {       scanButton.disabled = true;       scanButton.textContent = "この環境では利用できません";        setStatus(         "LINEアプリ内から開き、LIFF設定の「Scan QR」がONになっているか確認してください。",         "error"       );        return;     }      scanButton.disabled = false;     scanButton.textContent = "QRコードを読み取る";      setStatus(       "準備ができました。ボタンを押してください。",       "success"     );    } catch (error) {     console.error("LIFF初期化エラー：", error);      scanButton.disabled = true;     scanButton.textContent = "初期化に失敗しました";      const errorMessage =       error?.message || "原因不明のエラーが発生しました。";      setStatus(       `LIFFの初期化に失敗しました：${errorMessage}`,       "error"     );      alert(`LIFF初期化エラー
-${errorMessage}`);   } } {
-      try {
-        if (LIFF_ID === "ここにLIFF_IDを入力") {
-          throw new Error("LIFF IDが設定されていません。");
-        }
+   async function initializeLiff() {
 
-        await liff.init({
-          liffId: LIFF_ID
-        });
+  try {
 
-        if (!liff.isLoggedIn()) {
-          liff.login();
-          return;
-        }
+    await liff.init({
+      liffId: LIFF_ID
+    });
 
-        if (!liff.isApiAvailable("scanCodeV2")) {
-          scanButton.textContent = "この環境では利用できません";
-
-          setStatus(
-            "LINEアプリ内から開いてください。LIFF設定の「Scan QR」がONかも確認してください。",
-            "error"
-          );
-
-          return;
-        }
-
-        scanButton.disabled = false;
-        scanButton.textContent = "QRコードを読み取る";
-
-        setStatus(
-          "準備ができました。ボタンを押してください。"
-        );
-
-      catch (error) {
-  console.error(error);
-
-  alert(JSON.stringify(error));
-
-  scanButton.disabled = true;
-  scanButton.textContent = "初期化に失敗しました";
-
-  setStatus(error.message, "error");
-}
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
     }
 
+    if (!liff.isApiAvailable("scanCodeV2")) {
+
+      scanButton.disabled = true;
+      scanButton.textContent = "この環境では利用できません";
+
+      setStatus(
+        "LINEアプリ内から開き、Scan QRをONにしてください。",
+        "error"
+      );
+
+      return;
+    }
+
+    scanButton.disabled = false;
+    scanButton.textContent = "QRコードを読み取る";
+
+    setStatus(
+      "準備ができました。",
+      "success"
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(error.message);
+
+    scanButton.disabled = true;
+    scanButton.textContent = "初期化エラー";
+
+    setStatus(error.message, "error");
+  }
+
+}
     async function scanQrCode() {
       scanButton.disabled = true;
       setStatus("QRコードリーダーを起動しています。");
